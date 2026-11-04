@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REL301m – Reinforcement Learning Labs Dashboard</title>
+<style>
+:root{
+  --bg:#060a13;--panel:#0d1528;--line:#1e2a44;--text:#e2e8f0;--muted:#8fa0b8;
+  --blue:#38bdf8;--green:#4ade80;--amber:#fbbf24;--red:#f87171;--violet:#a78bfa;--pink:#f472b6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:"Segoe UI",Inter,system-ui,-apple-system,sans-serif;color:var(--text);min-height:100vh;
+  background:
+    radial-gradient(1100px 600px at 5% -10%,rgba(37,99,235,.28),transparent 60%),
+    radial-gradient(900px 500px at 105% 0%,rgba(147,51,234,.22),transparent 55%),
+    radial-gradient(800px 500px at 50% 120%,rgba(16,185,129,.12),transparent 60%),
+    var(--bg);
+}
+header{
+  position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);
+  background:rgba(6,10,19,.72);border-bottom:1px solid var(--line);
+}
+.head-in{max-width:1480px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:22px;
+  background:linear-gradient(135deg,#2563eb,#9333ea);box-shadow:0 0 24px rgba(99,102,241,.55)}
+.brand h1{font-size:18px;letter-spacing:.3px}
+.brand p{font-size:12px;color:var(--muted)}
+nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+nav button{
+  border:1px solid var(--line);background:rgba(15,23,42,.7);color:var(--muted);
+  padding:9px 16px;border-radius:999px;cursor:pointer;font-weight:600;font-size:13px;transition:.2s;
+}
+nav button:hover{color:var(--text);border-color:#334155}
+nav button.active{color:#fff;border-color:transparent;background:linear-gradient(135deg,#2563eb,#7c3aed);box-shadow:0 6px 20px rgba(79,70,229,.45)}
+main{max-width:1480px;margin:0 auto;padding:22px}
+.panel{display:none;animation:fade .35s ease}
+.panel.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{
+  background:linear-gradient(180deg,rgba(17,27,50,.92),rgba(10,16,31,.92));
+  border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 14px 40px rgba(0,0,0,.35);
+}
+.card h3{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.card h3 small{margin-left:auto;font-weight:500;color:var(--muted);font-size:11.5px}
+/* Overview */
+.hero{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-bottom:18px}
+.hero .card{padding:24px}
+.hero h2{font-size:30px;line-height:1.2;margin-bottom:10px}
+.grad{background:linear-gradient(90deg,#38bdf8,#a78bfa,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:var(--muted);line-height:1.65;font-size:14.5px}
+.pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.pill{font-size:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:rgba(30,41,59,.5);color:#cbd5e1}
+.lab-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:18px}
+.lab-card{position:relative;overflow:hidden;cursor:pointer;transition:.25s}
+.lab-card:hover{transform:translateY(-4px);border-color:#334155}
+.lab-card .glow{position:absolute;inset:-40% -40% auto auto;width:220px;height:220px;border-radius:50%;filter:blur(60px);opacity:.35}
+.lab-card .ico{font-size:34px}
+.lab-card h4{font-size:18px;margin:8px 0 4px}
+.lab-card .algo{font-size:12px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.lab-card ul{list-style:none;margin:12px 0;font-size:13px;color:#cbd5e1;line-height:1.75}
+.lab-card ul b{color:#fff}
+.formula{font-family:Consolas,"Cascadia Code",monospace;font-size:12.5px;background:rgba(2,6,23,.65);border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px;color:#e0f2fe;line-height:1.6}
+.ov-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+/* Lab layout */
+.lab-head{display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.lab-head h2{font-size:22px}
+.badge{font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px}
+.mode-live{background:rgba(251,191,36,.15);color:var(--amber);border:1px solid rgba(251,191,36,.35)}
+.mode-greedy{background:rgba(74,222,128,.13);color:var(--green);border:1px solid rgba(74,222,128,.35)}
+.mode-train{background:rgba(56,189,248,.14);color:var(--blue);border:1px solid rgba(56,189,248,.35)}
+.lab-grid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:18px}
+.sim-wrap{position:relative}
+canvas.sim{width:100%;height:470px;display:block;border-radius:14px;background:#050913}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.btn{border:0;color:#fff;font-weight:700;font-size:13px;padding:10px 14px;border-radius:11px;cursor:pointer;transition:.18s;
+  box-shadow:0 6px 16px rgba(0,0,0,.3)}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.12)}
+.btn:active{transform:none}
+.b-blue{background:linear-gradient(135deg,#2563eb,#1d4ed8)}
+.b-green{background:linear-gradient(135deg,#16a34a,#15803d)}
+.b-amber{background:linear-gradient(135deg,#d97706,#b45309)}
+.b-violet{background:linear-gradient(135deg,#9333ea,#7e22ce)}
+.b-slate{background:linear-gradient(135deg,#475569,#334155)}
+.b-red{background:linear-gradient(135deg,#dc2626,#b91c1c)}
+.speed{display:flex;align-items:center;gap:8px;margin-left:auto;font-size:12.5px;color:var(--muted)}
+.speed input{accent-color:#7c3aed;width:120px}
+.stats{display:flex;flex-direction:column;gap:2px}
+.stat{display:flex;justify-content:space-between;align-items:center;padding:7px 4px;border-bottom:1px dashed rgba(51,65,85,.6);font-size:13px}
+.stat span{color:var(--muted)}
+.stat b{font-family:Consolas,monospace;font-size:13.5px}
+.side{display:flex;flex-direction:column;gap:14px}
+.desc{font-size:12.8px;color:#cbd5e1;line-height:1.65}
+.desc b{color:#fff}
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:18px}
+canvas.chart{width:100%;height:250px;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-2px}
+.hint{font-size:12px;color:var(--blue);margin-top:8px}
+footer{text-align:center;color:#475569;font-size:12px;padding:24px}
+@media (max-width:1150px){.lab-grid,.hero,.ov-grid{grid-template-columns:1fr}.lab-cards{grid-template-columns:1fr}.charts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="head-in">
+    <div class="brand">
+      <div class="logo">🤖</div>
+      <div>
+        <h1>REL301m · Reinforcement Learning Labs</h1>
+        <p>Interactive Physics Control Simulators · Tabular TD Control</p>
+      </div>
+    </div>
+    <nav id="nav">
+      <button data-tab="overview" class="active">🏠 Tổng quan</button>
+      <button data-tab="l1">⚖️ Lab 1 · Ball &amp; Beam</button>
+      <button data-tab="l2">🦾 Lab 2 · Robotic Arm</button>
+      <button data-tab="l3">🚗 Lab 3 · Mountain Car</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ===================== OVERVIEW ===================== -->
+  <section class="panel active" id="panel-overview">
+    <div class="hero">
+      <div class="card">
+        <h2>3 bài toán điều khiển vật lý <span class="grad">học bằng Reinforcement Learning</span></h2>
+        <p>Các tác tử (agent) học từ con số 0 thông qua thử – sai, không được lập trình sẵn luật điều khiển.
+          Không gian trạng thái liên tục được <b>rời rạc hóa (State Aggregation / Binning)</b> thành lưới,
+          sau đó áp dụng 3 thuật toán <b>Temporal-Difference Control</b> cốt lõi của môn học.</p>
+        <div class="pill-row">
+          <span class="pill">🧠 Q-Learning (Off-policy)</span>
+          <span class="pill">📐 Expected SARSA</span>
+          <span class="pill">🔁 SARSA (On-policy)</span>
+          <span class="pill">🧮 ε-greedy exploration</span>
+          <span class="pill">🗺️ State Discretization</span>
+        </div>
+        <div class="controls" style="margin-top:20px">
+          <button class="btn b-blue" id="train-all">🚀 Huấn luyện cả 3 Lab (animated)</button>
+          <button class="btn b-red" id="reset-all">🗑 Reset tất cả</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>📊 So sánh tiến độ học của 3 Lab <small>Tỉ lệ thành công – trung bình trượt 20 ep</small></h3>
+        <canvas class="chart" id="ov-chart" style="height:240px"></canvas>
+        <div class="legend">
+          <span><i style="background:#38bdf8"></i>Lab 1 · Q-Learning</span>
+          <span><i style="background:#fbbf24"></i>Lab 2 · Expected SARSA</span>
+          <span><i style="background:#4ade80"></i>Lab 3 · SARSA</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="lab-cards">
+      <div class="card lab-card" data-goto="l1">
+        <div class="glow" style="background:#38bdf8"></div>
+        <div class="ico">⚖️</div>
+        <div class="algo" style="color:#38bdf8">Lab 1 · Q-Learning</div>
+        <h4>Thanh bập bênh cân bằng bóng</h4>
+        <ul>
+          <li><b>State:</b> (x + 1.6v, θ) → lưới 11 × 11</li>
+          <li><b>Action:</b> Nghiêng trái / Giữ cân bằng / Nghiêng phải</li>
+          <li><b>Mục tiêu:</b> Hãm bóng lăn và giữ bóng đứng yên ở tâm</li>
+        </ul>
+        <div class="formula">Q(s,a) ← Q(s,a) + α[ r + γ·max<sub>a'</sub>Q(s',a') − Q(s,a) ]</div>
+      </div>
+      <div class="card lab-card" data-goto="l2">
+        <div class="glow" style="background:#fbbf24"></div>
+        <div class="ico">🦾</div>
+        <div class="algo" style="color:#fbbf24">Lab 2 · Expected SARSA</div>
+        <h4>Cánh tay robot 2 khớp gắp mục tiêu</h4>
+        <ul>
+          <li><b>State:</b> (Δφ, Δr) sai số tọa độ cực → lưới 11 × 11</li>
+          <li><b>Action:</b> 5 lệnh mô-tơ khớp vai / khuỷu</li>
+          <li><b>Mục tiêu:</b> Đưa đầu kẹp chạm quả cầu mục tiêu</li>
+        </ul>
+        <div class="formula">Q(s,a) ← Q(s,a) + α[ r + γ·Σ<sub>a'</sub>π(a'|s')Q(s',a') − Q(s,a) ]</div>
+      </div>
+      <div class="card lab-card" data-goto="l3">
+        <div class="glow" style="background:#4ade80"></div>
+        <div class="ico">🚗</div>
+        <div class="algo" style="color:#4ade80">Lab 3 · SARSA</div>
+        <h4>Xe lấy đà leo đồi (Mountain Car)</h4>
+        <ul>
+          <li><b>State:</b> (vị trí x, vận tốc v) → lưới 16 × 16</li>
+          <li><b>Action:</b> Đẩy trái / Thả trôi / Đẩy phải</li>
+          <li><b>Mục tiêu:</b> Lùi lấy đà rồi vượt lên đỉnh đồi phải</li>
+        </ul>
+        <div class="formula">Q(S,A) ← Q(S,A) + α[ R + γ·Q(S',A') − Q(S,A) ]</div>
+      </div>
+    </div>
+
+    <div class="ov-grid">
+      <div class="card">
+        <h3>📋 Bảng kết quả thực nghiệm <small>cập nhật trực tiếp</small></h3>
+        <table>
+          <thead><tr><th>Lab</th><th>Thuật toán</th><th>Episodes</th><th>Thành công (20 ep)</th><th>Số bước TB (20 ep)</th></tr></thead>
+          <tbody id="ov-table"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>🧩 So sánh 3 thuật toán TD Control</h3>
+        <table>
+          <thead><tr><th>Thuật toán</th><th>Loại</th><th>Giá trị bước kế tiếp</th></tr></thead>
+          <tbody>
+            <tr><td><b style="color:#38bdf8">Q-Learning</b></td><td>Off-policy</td><td>max<sub>a'</sub> Q(s',a')</td></tr>
+            <tr><td><b style="color:#fbbf24">Expected SARSA</b></td><td>On/Off-policy</td><td>Σ π(a'|s') Q(s',a')</td></tr>
+            <tr><td><b style="color:#4ade80">SARSA</b></td><td>On-policy</td><td>Q(s',a') với a' ~ ε-greedy</td></tr>
+          </tbody>
+        </table>
+        <p class="desc" style="margin-top:12px">💡 Bấm vào từng thẻ Lab ở trên để mở mô phỏng. Trong mỗi Lab có biểu đồ đường cong học,
+          phần thưởng, bản đồ chính sách π(s) và hàm giá trị V(s) cập nhật theo thời gian thực.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-l1"></section>
+  <section class="panel" id="panel-l2"></section>
+  <section class="panel" id="panel-l3"></section>
+</main>
+<footer>REL301m · Reinforcement Learning · Ball &amp; Beam (Q-Learning) · Robotic Arm (Expected SARSA) · Mountain Car (SARSA)</footer>
+
+<script>
+"use strict";
+/* =========================================================
+   UTILITIES
+   ========================================================= */
+const PI = Math.PI;
+const U = (a, b) => a + (b - a) * Math.random();
+const clip = (v, a, b) => Math.max(a, Math.min(b, v));
+const deg = r => r * 180 / PI;
+const linspace = (a, b, n) => Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1));
+const digitize = (x, bins) => { let i = 0; while (i < bins.length && bins[i] <= x) i++; return i; };
+const wrap = a => ((((a + PI) % (2 * PI)) + 2 * PI) % (2 * PI)) - PI;
+const movingAvg = (arr, w) => { const o = []; let s = 0; for (let i = 0; i < arr.length; i++) { s += arr[i]; if (i >= w) s -= arr[i - w]; o.push(s / Math.min(i + 1, w)); } return o; };
+const lastMean = (arr, n) => { if (!arr.length) return null; const s = arr.slice(-n); return s.reduce((a, b) => a + b, 0) / s.length; };
+
+function setupCanvas(c) {
+  const r = c.getBoundingClientRect();
+  if (r.width < 10 || r.height < 10) return null;
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
+  if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+  const ctx = c.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: r.width, h: r.height };
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+/* =========================================================
+   TABULAR TD AGENT (Q-Learning / SARSA / Expected SARSA)
+   ========================================================= */
+class Agent {
+  constructor(c) { this.n1 = c.n1; this.n2 = c.n2; this.nA = c.nA; this.algo = c.algo; this.gamma = c.gamma; this.reset(); }
+  reset() {
+    const n = this.n1 * this.n2;
+    this.Q = new Float64Array(n * this.nA); this.visits = new Float64Array(n);
+    this.episodes = 0; this.steps = []; this.returns = []; this.success = [];
+  }
+  greedy(c) { const o = c * this.nA; let b = 0; for (let a = 1; a < this.nA; a++) if (this.Q[o + a] > this.Q[o + b]) b = a; return b; }
+  vmax(c) { const o = c * this.nA; let m = this.Q[o]; for (let a = 1; a < this.nA; a++) m = Math.max(m, this.Q[o + a]); return m; }
+  select(c, eps) { return Math.random() < eps ? Math.floor(Math.random() * this.nA) : this.greedy(c); }
+  update(c, a, r, nc, na, done, alpha, eps) {
+    let next = 0;
+    if (!done) {
+      if (this.algo === "qlearning") next = this.vmax(nc);                       // max_a' Q(s',a')
+      else if (this.algo === "sarsa") next = this.Q[nc * this.nA + na];          // Q(s',a') with a' ~ pi
+      else {                                                                     // E_pi[Q(s',a')]
+        const b = this.greedy(nc), o = nc * this.nA;
+        for (let k = 0; k < this.nA; k++) next += (eps / this.nA + (k === b ? 1 - eps : 0)) * this.Q[o + k];
+      }
+    }
+    const i = c * this.nA + a;
+    this.Q[i] += alpha * (r + this.gamma * next - this.Q[i]);
+    this.visits[c]++;
+  }
+  log(steps, ret, ok) { this.episodes++; this.steps.push(steps); this.returns.push(ret); this.success.push(ok ? 100 : 0); }
+}
+
+/* =========================================================
+   ENVIRONMENTS (ported 1:1 from the Python labs)
+   ========================================================= */
+class BallBeamEnv {
+  constructor() { this.g = 9.81; this.dt = 0.025; this.maxX = 1.0; this.maxV = 1.2; this.maxTheta = 14 * PI / 180; this.reset(); }
+  reset() {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    this.x = side * U(0.40, 0.68); this.v = side * U(0.28, 0.45); this.theta = side * U(0.03, 0.08); this.thetaDot = 0;
+    return this.state();
+  }
+  state() { return [this.x, this.v, this.theta]; }
+  step(a) {
+    const err = Math.min(1, Math.abs(this.x) * 1.5 + Math.abs(this.v) * 2.0);
+    const rate = 1.25 * PI / 180 * (0.10 + 0.90 * err);
+    const target = a === 0 ? -rate : a === 2 ? rate : clip(-0.35 * this.theta, -rate, rate);
+    this.thetaDot = 0.72 * this.thetaDot + 0.28 * target;                       // smooth servo
+    this.theta = clip(this.theta + this.thetaDot, -this.maxTheta, this.maxTheta);
+    const acc = (5 / 7) * this.g * Math.sin(this.theta);                       // rolling sphere
+    const damp = Math.abs(this.x) < 0.12 ? 0.962 : 0.988;
+    this.v = clip(damp * this.v + acc * this.dt, -this.maxV, this.maxV);
+    this.x += this.v * this.dt;
+    const dropped = Math.abs(this.x) > this.maxX;
+    let r;
+    if (dropped) r = -50;
+    else {
+      const des = clip(-0.22 * this.x - 0.36 * this.v, -this.maxTheta, this.maxTheta);
+      const ae = Math.abs(this.theta - des);
+      r = 2.0 - 1.6 * Math.abs(this.x) - 0.9 * Math.abs(this.v) - 7.0 * ae;
+      if (a === 1 && Math.abs(des) < 0.025) r += 1.0;
+    }
+    return { state: this.state(), reward: r, done: dropped };
+  }
+}
+
+class ArmEnv {
+  constructor() {
+    this.L1 = 0.55; this.L2 = 0.45; this.maxStep = 0.055; this.minT2 = 0.18; this.maxT2 = 2.70; this.tr = 0.06;
+    this.t1 = 0; this.t2 = 1.2; this.w1 = 0; this.w2 = 0; this.tx = 0.5; this.ty = 0.5; this.reset();
+  }
+  fk() {
+    const x1 = this.L1 * Math.cos(this.t1), y1 = this.L1 * Math.sin(this.t1);
+    return [[x1, y1], [x1 + this.L2 * Math.cos(this.t1 + this.t2), y1 + this.L2 * Math.sin(this.t1 + this.t2)]];
+  }
+  spawn(xy) {
+    if (xy) {
+      let [tx, ty] = xy; let r = Math.hypot(tx, ty);
+      if (r < 0.22 || r > 0.94) { const g = Math.atan2(ty, tx); r = clip(r, 0.22, 0.94); tx = r * Math.cos(g); ty = r * Math.sin(g); }
+      this.tx = tx; this.ty = ty;
+    } else { const r = U(0.28, 0.90), g = U(-PI, PI); this.tx = r * Math.cos(g); this.ty = r * Math.sin(g); }
+  }
+  reset(keep = false, xy = null) {
+    if (!keep) { this.t1 = U(-PI, PI); this.t2 = U(0.4, 2.3); }
+    this.w1 = 0; this.w2 = 0; this.spawn(xy); return this.state();
+  }
+  state() {
+    const [, [xe, ye]] = this.fk();
+    const dphi = wrap(Math.atan2(this.ty, this.tx) - Math.atan2(ye, xe));
+    const dr = Math.hypot(this.tx, this.ty) - Math.hypot(xe, ye);
+    return [dphi, dr, Math.hypot(this.tx - xe, this.ty - ye)];
+  }
+  step(a) {
+    const [dphi, dr, prev] = this.state(), M = this.maxStep;
+    const ps = Math.min(1, Math.max(0.12, Math.abs(dphi) / 0.16));
+    const rs = Math.min(1, Math.max(0.12, Math.abs(dr) / 0.14));
+    let c1 = 0, c2 = 0;
+    if (a === 0) { c1 = M * ps; if (Math.abs(dr) > 0.03) c2 = -0.35 * Math.sign(dr) * M * rs; }
+    else if (a === 1) { c1 = -M * ps; if (Math.abs(dr) > 0.03) c2 = -0.35 * Math.sign(dr) * M * rs; }
+    else if (a === 2) { c2 = -M * rs; c1 = 0.42 * M * rs; }
+    else if (a === 3) { c2 = M * rs; c1 = -0.42 * M * rs; }
+    else { c1 = 0.25 * clip(dphi, -M, M); c2 = -0.25 * clip(dr, -M, M); }
+    this.w1 = 0.55 * this.w1 + 0.45 * c1; this.w2 = 0.55 * this.w2 + 0.45 * c2;   // smooth servo
+    this.t1 = wrap(this.t1 + this.w1); this.t2 = clip(this.t2 + this.w2, this.minT2, this.maxT2);
+    const s = this.state(), reached = s[2] <= this.tr;
+    let r = (prev - s[2]) * 28.0 - 0.12;
+    if (a === 4 && s[2] < 0.12) r += 0.5;
+    if (reached) r += 50;
+    return { state: s, reward: r, done: reached };
+  }
+}
+
+class MountainCarEnv {
+  constructor() { this.minP = -1.2; this.maxP = 0.5; this.maxV = 0.07; this.goal = 0.5; this.reset(); }
+  reset() { this.pos = U(-0.6, -0.4); this.vel = 0; return this.state(); }
+  state() { return [this.pos, this.vel]; }
+  step(a) {
+    this.vel = clip(this.vel + 0.001 * (a - 1) - 0.0025 * Math.cos(3 * this.pos), -this.maxV, this.maxV);
+    this.pos = clip(this.pos + this.vel, this.minP, this.maxP);
+    if (this.pos <= this.minP && this.vel < 0) this.vel = 0;
+    return { state: this.state(), reward: -1, done: this.pos >= this.goal };
+  }
+  static hill(x) { return Math.sin(3 * x) * 0.45 + 0.55; }
+}
+
+/* =========================================================
+   LAB CONFIGURATIONS
+   ========================================================= */
+const ballBins = [-0.75, -0.45, -0.22, -0.08, -0.025, 0.025, 0.08, 0.22, 0.45, 0.75];
+const thetaBins = [-0.18, -0.11, -0.06, -0.025, -0.008, 0.008, 0.025, 0.06, 0.11, 0.18];
+const phiBins = [-0.80, -0.40, -0.18, -0.08, -0.03, 0.03, 0.08, 0.18, 0.40, 0.80];
+const rBins = [-0.45, -0.25, -0.12, -0.05, -0.02, 0.02, 0.05, 0.12, 0.25, 0.45];
+const posBins = linspace(-1.2, 0.5, 17), velBins = linspace(-0.07, 0.07, 17);
+
+const CFG = {
+  l1: {
+    id: "l1", icon: "⚖️", title: "Lab 1 · Thanh Bập Bênh Cân Bằng Bóng", algo: "qlearning", algoName: "Q-Learning (Off-policy TD Control)",
+    color: "#38bdf8", n1: 11, n2: 11, nA: 3, gamma: 0.98, maxSteps: 400, trainN: 350, chunk: 6, higherBetter: true, greedyNoTimeout: true,
+    makeEnv: () => new BallBeamEnv(), resetEnv: (e) => e.reset(),
+    disc: s => digitize(s[0] + 1.6 * s[1], ballBins) * 11 + digitize(s[2], thetaBins),
+    alphaFn: ep => Math.max(0.05, 0.25 * Math.pow(0.992, ep)), epsFn: ep => Math.max(0.02, 0.25 * Math.pow(0.99, ep)),
+    successOf: done => !done, idleAction: 1,
+    actions: ["↙ Nghiêng trái", "⚖ Giữ cân bằng", "↘ Nghiêng phải"], actionColors: ["#f97316", "#4ade80", "#38bdf8"],
+    axes: { x: "Trạng thái bóng (x + 1.6·v)", y: "Góc thanh θ", xl: ["trái", "phải"], yl: ["−θ", "+θ"] },
+    disturb: { label: "💨 Hất bóng về mép", fn: L => { L.env.v = (L.env.x >= 0 ? -1 : 1) * 0.65; } },
+    formula: "Q(s,a) ← Q(s,a) + α[ r + γ·max<sub>a'</sub> Q(s',a') − Q(s,a) ]",
+    desc: "Quả bóng thép lăn trên thanh dài 2 m với gia tốc <b>a = 5/7·g·sin θ</b>. Agent điều khiển góc nghiêng để <b>hãm quán tính</b> và đưa bóng về tâm. Phạt <b>−50</b> nếu bóng rơi khỏi thanh.",
+    win: s => `🏆 HOÀN HẢO! GIỮ BÓNG ĐỦ ${s} BƯỚC`, fail: s => `💥 BÓNG RƠI KHỎI THANH Ở BƯỚC ${s}`, timeout: s => `⏱ Hết ${s} bước`,
+    stats: L => [["Vị trí bóng x", `${L.env.x >= 0 ? "+" : ""}${L.env.x.toFixed(3)} m`, "#38bdf8"], ["Vận tốc v", `${L.env.v >= 0 ? "+" : ""}${L.env.v.toFixed(3)} m/s`, "#fbbf24"],
+    ["Góc thanh θ", `${deg(L.env.theta) >= 0 ? "+" : ""}${deg(L.env.theta).toFixed(2)}°`, "#e2e8f0"]],
+  },
+  l2: {
+    id: "l2", icon: "🦾", title: "Lab 2 · Cánh Tay Robot 2 Khớp Gắp Mục Tiêu", algo: "expsarsa", algoName: "Expected SARSA",
+    color: "#fbbf24", n1: 11, n2: 11, nA: 5, gamma: 0.96, maxSteps: 160, trainN: 300, chunk: 8, higherBetter: false,
+    makeEnv: () => new ArmEnv(), resetEnv: (e, soft, xy) => e.reset(soft, xy),
+    disc: s => digitize(s[0], phiBins) * 11 + digitize(s[1], rBins),
+    alphaFn: () => 0.25, epsFn: ep => Math.max(0.02, 0.25 * Math.pow(0.99, ep)),
+    successOf: done => done, idleAction: 4,
+    actions: ["↺ Xoay vai trái", "↻ Xoay vai phải", "↗ Duỗi khuỷu", "↙ Gập khuỷu", "⚖ Khóa tinh chỉnh"],
+    actionColors: ["#38bdf8", "#818cf8", "#f97316", "#f472b6", "#4ade80"],
+    axes: { x: "Sai số góc Δφ", y: "Sai số bán kính Δr", xl: ["−0.8", "+0.8 rad"], yl: ["−0.45", "+0.45 m"] },
+    disturb: { label: "🎯 Đổi vị trí mục tiêu", fn: L => L.startEpisode(true) },
+    formula: "Q(s,a) ← Q(s,a) + α[ r + γ·Σ<sub>a'</sub> π(a'|s')·Q(s',a') − Q(s,a) ]",
+    desc: "Robot phẳng 2 bậc tự do (L₁ = 0.55 m, L₂ = 0.45 m). Trạng thái là <b>sai số tọa độ cực</b> giữa đầu kẹp và mục tiêu. Thưởng theo độ giảm khoảng cách, <b>+50</b> khi gắp trúng.",
+    hint: "🖱️ Click chuột lên khung mô phỏng để đặt mục tiêu mới!",
+    win: s => `🎯 ĐÃ GẮP TRÚNG MỤC TIÊU SAU ${s} BƯỚC`, fail: s => `💥 Thất bại ở bước ${s}`, timeout: s => `⏱ Hết giờ (${s} bước) – thử mục tiêu mới`,
+    stats: L => [["Khớp vai θ₁", `${deg(L.env.t1).toFixed(1)}°`, "#38bdf8"], ["Khớp khuỷu θ₂", `${deg(L.env.t2).toFixed(1)}°`, "#fbbf24"],
+    ["Khoảng cách tới đích", `${L.state[2].toFixed(3)} m`, "#e2e8f0"], ["Mục tiêu đã gắp", `${L.caught}`, "#4ade80"]],
+    onStep: L => { const [, e] = L.env.fk(); L.trail.push(e); if (L.trail.length > 70) L.trail.shift(); },
+  },
+  l3: {
+    id: "l3", icon: "🚗", title: "Lab 3 · Xe Lấy Đà Leo Đồi (Mountain Car)", algo: "sarsa", algoName: "SARSA (On-policy TD Control)",
+    color: "#4ade80", n1: 16, n2: 16, nA: 3, gamma: 0.99, maxSteps: 500, trainN: 500, chunk: 10, higherBetter: false,
+    makeEnv: () => new MountainCarEnv(), resetEnv: e => e.reset(),
+    disc: s => clip(digitize(s[0], posBins) - 1, 0, 15) * 16 + clip(digitize(s[1], velBins) - 1, 0, 15),
+    alphaFn: () => 0.22, epsFn: ep => Math.max(0.01, 0.05 * Math.pow(0.995, ep)),
+    successOf: done => done, idleAction: 1,
+    actions: ["◀ Đẩy trái", "• Thả trôi", "▶ Đẩy phải"], actionColors: ["#f97316", "#64748b", "#38bdf8"],
+    axes: { x: "Vị trí x", y: "Vận tốc v", xl: ["−1.2", "0.5"], yl: ["−0.07", "+0.07"] },
+    disturb: { label: "🎲 Thả xe ở vị trí ngẫu nhiên", fn: L => { L.env.pos = U(-1.1, -0.2); L.env.vel = 0; L.state = L.env.state(); } },
+    formula: "Q(S,A) ← Q(S,A) + α[ R + γ·Q(S',A') − Q(S,A) ]",
+    desc: "Động cơ (0.001) <b>yếu hơn trọng lực</b> (0.0025·cos 3x) nên xe phải <b>lùi lên dốc trái lấy đà</b>. Thưởng −1 mỗi bước, khởi tạo Q = 0 (<b>Optimistic Initial Values</b>) để thúc đẩy khám phá.",
+    win: s => `🎉 CHẠM ĐỈNH ĐỒI SAU ${s} BƯỚC`, fail: s => `💥 Thất bại ở bước ${s}`, timeout: s => `⏱ Hết ${s} bước – chưa lên được đỉnh`,
+    stats: L => [["Vị trí x", `${L.env.pos.toFixed(3)}`, "#38bdf8"], ["Vận tốc v", `${L.env.vel >= 0 ? "+" : ""}${L.env.vel.toFixed(4)}`, "#fbbf24"],
+    ["Kỷ lục nhanh nhất", L.best === null ? "—" : `${L.best} bước`, "#4ade80"]],
+    onStep: L => { L.trail.push(L.env.pos); if (L.trail.length > 40) L.trail.shift(); },
+  },
+};
+
+/* =========================================================
+   LAB RUNNER
+   ========================================================= */
+class Lab {
+  constructor(cfg) {
+    this.cfg = cfg; this.env = cfg.makeEnv(); this.agent = new Agent(cfg);
+    this.mode = "live"; this.paused = false; this.speed = 1; this.trainQueue = 0; this.trainTotal = 0;
+    this.banner = null; this.best = null; this.caught = 0; this.trail = []; this.dirty = true;
+    this.startEpisode(false);
+  }
+  eps() { return this.mode === "greedy" ? 0 : this.cfg.epsFn(this.agent.episodes); }
+  alpha() { return this.cfg.alphaFn(this.agent.episodes); }
+  startEpisode(soft, xy) {
+    this.state = this.cfg.resetEnv(this.env, soft, xy);
+    this.cell = this.cfg.disc(this.state);
+    this.action = this.agent.select(this.cell, this.eps());
+    this.lastAction = this.cfg.idleAction; this.epSteps = 0; this.epRet = 0; this.trail = []; this.banner = null;
+  }
+  stepOnce(learn) {
+    const eps = this.eps(), ag = this.agent;
+    const a = ag.algo === "sarsa" ? this.action : ag.select(this.cell, eps);
+    const res = this.env.step(a);
+    const nc = this.cfg.disc(res.state), na = ag.select(nc, eps);
+    if (learn) ag.update(this.cell, a, res.reward, nc, na, res.done, this.alpha(), eps);
+    this.lastAction = a; this.state = res.state; this.cell = nc; this.action = na;
+    this.epSteps++; this.epRet += res.reward;
+    return res.done;
+  }
+  fastEpisode() {
+    const saved = this.mode; this.mode = "live";
+    this.startEpisode(false);
+    let done = false;
+    while (!done && this.epSteps < this.cfg.maxSteps) done = this.stepOnce(true);
+    const ok = this.cfg.successOf(done);
+    this.agent.log(this.epSteps, this.epRet, ok);
+    if (ok && !this.cfg.higherBetter && (this.best === null || this.epSteps < this.best)) this.best = this.epSteps;
+    this.mode = saved; this.dirty = true; OV_DIRTY = true;
+  }
+  queueTraining(n) { this.trainQueue += n; this.trainTotal = this.trainQueue; this.paused = false; }
+  setMode(m) { this.mode = m; this.startEpisode(true); }
+  reset() { this.agent.reset(); this.best = null; this.caught = 0; this.trainQueue = 0; this.mode = "live"; this.startEpisode(false); this.dirty = true; OV_DIRTY = true; }
+  endEpisode(done) {
+    const ok = this.cfg.successOf(done), c = this.cfg;
+    if (this.mode === "live") { this.agent.log(this.epSteps, this.epRet, ok); this.dirty = true; OV_DIRTY = true; }
+    if (ok) {
+      if (!c.higherBetter && (this.best === null || this.epSteps < this.best)) this.best = this.epSteps;
+      if (c.id === "l2") this.caught++;
+      this.banner = { text: c.win(this.epSteps), color: "#16a34a", t: 34 };
+    } else if (done) this.banner = { text: c.fail(this.epSteps), color: "#dc2626", t: 26 };
+    else this.banner = { text: c.timeout(this.epSteps), color: "#b45309", t: 22 };
+  }
+  frame() {
+    if (this.trainQueue > 0) {
+      const k = Math.min(this.cfg.chunk, this.trainQueue);
+      for (let i = 0; i < k; i++) this.fastEpisode();
+      this.trainQueue -= k;
+      if (this.trainQueue === 0) this.setMode("greedy");
+      return;
+    }
+    if (this.paused) return;
+    if (this.banner) { if (--this.banner.t <= 0) this.startEpisode(true); return; }
+    for (let k = 0; k < this.speed; k++) {
+      const done = this.stepOnce(this.mode === "live");
+      if (this.cfg.onStep) this.cfg.onStep(this);
+      const timeout = this.epSteps >= this.cfg.maxSteps && !(this.mode === "greedy" && this.cfg.greedyNoTimeout);
+      if (done || timeout) { this.endEpisode(done); break; }
+    }
+  }
+}
+
+/* =========================================================
+   SIMULATION RENDERERS
+   ========================================================= */
+function drawBackdrop(ctx, w, h) {
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#0b1430"); g.addColorStop(1, "#04070f");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(56,189,248,0.05)"; ctx.lineWidth = 1;
+  for (let x = 0; x < w; x += 32) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (let y = 0; y < h; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+}
+
+function drawLab1(ctx, w, h, L) {
+  const e = L.env; drawBackdrop(ctx, w, h);
+  const cx = w / 2, cy = h * 0.55, half = Math.min(w * 0.40, 320);
+  ctx.setLineDash([5, 6]); ctx.strokeStyle = "rgba(148,163,184,.25)"; ctx.beginPath(); ctx.moveTo(cx - half - 30, cy); ctx.lineTo(cx + half + 30, cy); ctx.stroke(); ctx.setLineDash([]);
+  // pedestal
+  const pg = ctx.createLinearGradient(0, cy, 0, cy + 120); pg.addColorStop(0, "#475569"); pg.addColorStop(1, "#1e293b");
+  ctx.fillStyle = pg; ctx.beginPath(); ctx.moveTo(cx, cy + 6); ctx.lineTo(cx - 44, cy + 118); ctx.lineTo(cx + 44, cy + 118); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#1e293b"; roundRect(ctx, cx - 90, cy + 116, 180, 16, 6); ctx.fill();
+  // beam + ball in rotated frame
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(e.theta);
+  const bg = ctx.createLinearGradient(0, -8, 0, 8); bg.addColorStop(0, "#7dd3fc"); bg.addColorStop(1, "#0369a1");
+  ctx.shadowColor = "rgba(56,189,248,.6)"; ctx.shadowBlur = 16; ctx.fillStyle = bg; roundRect(ctx, -half, -7, half * 2, 14, 7); ctx.fill(); ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(74,222,128,.85)"; roundRect(ctx, -22, -8, 44, 16, 6); ctx.fill();
+  for (let k = -4; k <= 4; k++) { ctx.fillStyle = "rgba(255,255,255,.35)"; ctx.fillRect(k * half / 4.5 - 1, -3, 2, 6); }
+  const bx = clip(e.x / e.maxX, -1.15, 1.15) * half, by = -7 - 19, ok = Math.abs(e.x) < 0.08 && Math.abs(e.v) < 0.08;
+  const bc = ok ? ["#bbf7d0", "#16a34a"] : Math.abs(e.x) < 0.65 ? ["#fde68a", "#d97706"] : ["#fecaca", "#dc2626"];
+  const rg = ctx.createRadialGradient(bx - 6, by - 6, 2, bx, by, 19); rg.addColorStop(0, bc[0]); rg.addColorStop(1, bc[1]);
+  ctx.shadowColor = bc[1]; ctx.shadowBlur = 22; ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(bx, by, 19, 0, 2 * PI); ctx.fill(); ctx.shadowBlur = 0;
+  if (Math.abs(e.v) > 0.03) {
+    const ax = bx + e.v * 90; ctx.strokeStyle = "#fb923c"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(bx, by - 30); ctx.lineTo(ax, by - 30); ctx.stroke();
+    const d = Math.sign(e.v); ctx.fillStyle = "#fb923c"; ctx.beginPath(); ctx.moveTo(ax + d * 8, by - 30); ctx.lineTo(ax, by - 35); ctx.lineTo(ax, by - 25); ctx.fill();
+  }
+  ctx.restore();
+  ctx.fillStyle = "#f8fafc"; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, 2 * PI); ctx.fill();
+  ctx.fillStyle = "#4ade80"; ctx.font = "600 12px Segoe UI"; ctx.textAlign = "center"; ctx.fillText("VÙNG ĐÍCH CÂN BẰNG (x = 0)", cx, cy + 150);
+  // angle gauge
+  ctx.fillStyle = "#94a3b8"; ctx.font = "12px Consolas"; ctx.textAlign = "left";
+  ctx.fillText(`θ = ${deg(e.theta).toFixed(2)}°   x = ${e.x.toFixed(3)} m   v = ${e.v.toFixed(3)} m/s`, 16, h - 16);
+}
+
+function drawLab2(ctx, w, h, L) {
+  const e = L.env; drawBackdrop(ctx, w, h);
+  const cx = w / 2, cy = h / 2, sc = Math.min(w, h) * 0.44; L.view = { cx, cy, sc };
+  const P = (x, y) => [cx + x * sc, cy - y * sc];
+  ctx.setLineDash([4, 6]); ctx.strokeStyle = "rgba(148,163,184,.22)";
+  ctx.beginPath(); ctx.arc(cx, cy, (e.L1 + e.L2) * sc, 0, 2 * PI); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, 0.22 * sc, 0, 2 * PI); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(56,189,248,.04)"; ctx.beginPath(); ctx.arc(cx, cy, (e.L1 + e.L2) * sc, 0, 2 * PI); ctx.fill();
+  // target
+  const [tx, ty] = P(e.tx, e.ty), tr = e.tr * sc, pulse = 1 + 0.12 * Math.sin(performance.now() / 220);
+  ctx.strokeStyle = "rgba(74,222,128,.5)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(tx, ty, tr * 1.7 * pulse, 0, 2 * PI); ctx.stroke();
+  const tg = ctx.createRadialGradient(tx - 4, ty - 4, 2, tx, ty, tr); tg.addColorStop(0, "#bbf7d0"); tg.addColorStop(1, "#16a34a");
+  ctx.shadowColor = "#22c55e"; ctx.shadowBlur = 24; ctx.fillStyle = tg; ctx.beginPath(); ctx.arc(tx, ty, tr, 0, 2 * PI); ctx.fill(); ctx.shadowBlur = 0;
+  ctx.fillStyle = "#4ade80"; ctx.font = "700 11px Segoe UI"; ctx.textAlign = "center"; ctx.fillText("MỤC TIÊU", tx, ty - tr - 10);
+  // trail
+  if (L.trail.length > 1) {
+    for (let i = 1; i < L.trail.length; i++) {
+      const [a1, b1] = P(...L.trail[i - 1]), [a2, b2] = P(...L.trail[i]);
+      ctx.strokeStyle = `rgba(56,189,248,${i / L.trail.length})`; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(a1, b1); ctx.lineTo(a2, b2); ctx.stroke();
+    }
+  }
+  const [[x1, y1], [xe, ye]] = e.fk(), [s1x, s1y] = P(x1, y1), [sex, sey] = P(xe, ye);
+  ctx.lineCap = "round";
+  ctx.shadowColor = "rgba(56,189,248,.6)"; ctx.shadowBlur = 14; ctx.strokeStyle = "#38bdf8"; ctx.lineWidth = 16; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(s1x, s1y); ctx.stroke();
+  ctx.shadowColor = "rgba(251,191,36,.6)"; ctx.strokeStyle = "#fbbf24"; ctx.lineWidth = 11; ctx.beginPath(); ctx.moveTo(s1x, s1y); ctx.lineTo(sex, sey); ctx.stroke(); ctx.shadowBlur = 0;
+  ctx.fillStyle = "#334155"; ctx.strokeStyle = "#e2e8f0"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, 17, 0, 2 * PI); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#0f172a"; ctx.beginPath(); ctx.arc(s1x, s1y, 10, 0, 2 * PI); ctx.fill(); ctx.stroke();
+  const ang = e.t1 + e.t2; ctx.strokeStyle = "#f8fafc"; ctx.lineWidth = 3.5;
+  for (const sg of [-1, 1]) { const ca = ang + sg * 0.45; ctx.beginPath(); ctx.moveTo(sex, sey); ctx.lineTo(sex + 16 * Math.cos(ca), sey - 16 * Math.sin(ca)); ctx.stroke(); }
+  ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.arc(sex, sey, 6, 0, 2 * PI); ctx.fill(); ctx.lineCap = "butt";
+  ctx.fillStyle = "#94a3b8"; ctx.font = "12px Consolas"; ctx.textAlign = "left";
+  ctx.fillText(`θ₁ = ${deg(e.t1).toFixed(1)}°   θ₂ = ${deg(e.t2).toFixed(1)}°   d = ${L.state[2].toFixed(3)} m`, 16, h - 16);
+}
+
+const STARS = Array.from({ length: 60 }, () => [Math.random(), Math.random() * 0.6, Math.random() * 1.4 + 0.3]);
+function drawLab3(ctx, w, h, L) {
+  const e = L.env;
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#0b1230"); g.addColorStop(1, "#1a1035"); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  for (const [sx, sy, r] of STARS) { ctx.fillStyle = "rgba(226,232,240,.7)"; ctx.beginPath(); ctx.arc(sx * w, sy * h, r, 0, 2 * PI); ctx.fill(); }
+  const m = 50, P = x => [m + (x + 1.2) / 1.7 * (w - 2 * m), h - 60 - MountainCarEnv.hill(x) * (h - 150)];
+  ctx.beginPath(); let first = true;
+  for (let i = 0; i <= 160; i++) { const x = -1.2 + 1.7 * i / 160, [px, py] = P(x); if (first) { ctx.moveTo(px, py); first = false; } else ctx.lineTo(px, py); }
+  ctx.lineTo(w - m, h); ctx.lineTo(m, h); ctx.closePath();
+  const mg = ctx.createLinearGradient(0, h * 0.3, 0, h); mg.addColorStop(0, "#14532d"); mg.addColorStop(1, "#052e16"); ctx.fillStyle = mg; ctx.fill();
+  ctx.beginPath(); for (let i = 0; i <= 160; i++) { const [px, py] = P(-1.2 + 1.7 * i / 160); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+  ctx.strokeStyle = "#4ade80"; ctx.lineWidth = 3; ctx.shadowColor = "#22c55e"; ctx.shadowBlur = 12; ctx.stroke(); ctx.shadowBlur = 0;
+  // flag
+  const [fx, fy] = P(e.goal); ctx.strokeStyle = "#f8fafc"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - 54); ctx.stroke();
+  ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.moveTo(fx, fy - 54); ctx.lineTo(fx - 30, fy - 44); ctx.lineTo(fx, fy - 34); ctx.fill();
+  ctx.fillStyle = "#fca5a5"; ctx.font = "700 11px Segoe UI"; ctx.textAlign = "right"; ctx.fillText("ĐÍCH x = 0.5", fx - 6, fy - 62);
+  // ghost trail
+  L.trail.forEach((x, i) => { const [px, py] = P(x); ctx.fillStyle = `rgba(56,189,248,${0.5 * i / L.trail.length})`; ctx.beginPath(); ctx.arc(px, py - 14, 4, 0, 2 * PI); ctx.fill(); });
+  // car
+  const [cx, cy] = P(e.pos), [ax, ay] = P(e.pos - 0.02), [bx2, by2] = P(Math.min(e.pos + 0.02, 0.52));
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.atan2(by2 - ay, bx2 - ax));
+  const a = L.lastAction;
+  if (a === 0) { ctx.fillStyle = "#f97316"; ctx.beginPath(); ctx.moveTo(24, -12); ctx.lineTo(24, -20); ctx.lineTo(42 + Math.random() * 8, -16); ctx.fill(); }
+  if (a === 2) { ctx.fillStyle = "#f97316"; ctx.beginPath(); ctx.moveTo(-24, -12); ctx.lineTo(-24, -20); ctx.lineTo(-42 - Math.random() * 8, -16); ctx.fill(); }
+  const cg = ctx.createLinearGradient(0, -36, 0, -8); cg.addColorStop(0, "#7dd3fc"); cg.addColorStop(1, "#0284c7");
+  ctx.fillStyle = cg; roundRect(ctx, -24, -26, 48, 18, 5); ctx.fill();
+  ctx.fillStyle = "#0369a1"; roundRect(ctx, -13, -37, 26, 12, 4); ctx.fill();
+  ctx.fillStyle = "rgba(186,230,253,.8)"; ctx.fillRect(-9, -34, 8, 7); ctx.fillRect(2, -34, 8, 7);
+  for (const wx of [-14, 14]) { ctx.fillStyle = "#0f172a"; ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(wx, -7, 7, 0, 2 * PI); ctx.fill(); ctx.stroke(); }
+  ctx.restore();
+  ctx.fillStyle = "#94a3b8"; ctx.font = "12px Consolas"; ctx.textAlign = "left";
+  ctx.fillText(`x = ${e.pos.toFixed(3)}   v = ${e.vel.toFixed(4)}   hành động: ${L.cfg.actions[a]}`, 16, h - 16);
+}
+
+function drawOverlay(ctx, w, h, L) {
+  if (L.banner) {
+    ctx.font = "700 15px Segoe UI"; const tw = ctx.measureText(L.banner.text).width + 44;
+    ctx.fillStyle = L.banner.color; ctx.shadowColor = L.banner.color; ctx.shadowBlur = 20;
+    roundRect(ctx, w / 2 - tw / 2, 18, tw, 42, 12); ctx.fill(); ctx.shadowBlur = 0;
+    ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(L.banner.text, w / 2, 44);
+  }
+  if (L.trainQueue > 0) {
+    const p = 1 - L.trainQueue / L.trainTotal;
+    ctx.fillStyle = "rgba(2,6,23,.55)"; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#e2e8f0"; ctx.font = "700 18px Segoe UI"; ctx.textAlign = "center";
+    ctx.fillText(`⚡ Đang huấn luyện… Episode ${L.agent.episodes}`, w / 2, h / 2 - 22);
+    ctx.fillStyle = "#1e293b"; roundRect(ctx, w / 2 - 200, h / 2, 400, 14, 7); ctx.fill();
+    const pg = ctx.createLinearGradient(w / 2 - 200, 0, w / 2 + 200, 0); pg.addColorStop(0, "#2563eb"); pg.addColorStop(1, "#a855f7");
+    ctx.fillStyle = pg; roundRect(ctx, w / 2 - 200, h / 2, Math.max(14, 400 * p), 14, 7); ctx.fill();
+    ctx.fillStyle = "#94a3b8"; ctx.font = "13px Segoe UI"; ctx.fillText(`${Math.round(p * 100)}%  ·  ε = ${L.cfg.epsFn(L.agent.episodes).toFixed(3)}`, w / 2, h / 2 + 40);
+  }
+  if (L.paused && L.trainQueue === 0) { ctx.fillStyle = "#fbbf24"; ctx.font = "700 14px Segoe UI"; ctx.textAlign = "right"; ctx.fillText("⏸ TẠM DỪNG", w - 16, 28); }
+}
+
+/* =========================================================
+   CHARTS
+   ========================================================= */
+function lineChart(c, o) {
+  const S = setupCanvas(c); if (!S) return; const { ctx, w, h } = S;
+  ctx.clearRect(0, 0, w, h);
+  const Lp = 50, Rp = 14, Tp = 12, Bp = 30, pw = w - Lp - Rp, ph = h - Tp - Bp;
+  const n = Math.max(0, ...o.series.map(s => s.data.length));
+  ctx.fillStyle = "rgba(2,6,23,.45)"; roundRect(ctx, Lp, Tp, pw, ph, 8); ctx.fill();
+  if (n < 2) { ctx.fillStyle = "#64748b"; ctx.font = "13px Segoe UI"; ctx.textAlign = "center"; ctx.fillText(o.empty || "Chưa có dữ liệu – hãy bấm ⚡ Huấn luyện", Lp + pw / 2, Tp + ph / 2); return; }
+  let ymin = o.ymin, ymax = o.ymax;
+  if (ymin === undefined || ymax === undefined) {
+    let lo = Infinity, hi = -Infinity; for (const s of o.series) for (const v of s.data) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    if (lo === hi) { lo -= 1; hi += 1; } const pad = (hi - lo) * 0.08;
+    if (ymin === undefined) ymin = lo - pad; if (ymax === undefined) ymax = hi + pad;
+  }
+  const X = i => Lp + i / (n - 1) * pw, Y = v => Tp + ph - (clip(v, ymin, ymax) - ymin) / (ymax - ymin) * ph;
+  ctx.font = "11px Segoe UI"; ctx.fillStyle = "#64748b"; ctx.strokeStyle = "rgba(100,116,139,.18)"; ctx.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) {
+    const v = ymin + (ymax - ymin) * k / 4, y = Y(v);
+    ctx.beginPath(); ctx.moveTo(Lp, y); ctx.lineTo(Lp + pw, y); ctx.stroke();
+    ctx.textAlign = "right"; ctx.fillText(Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1), Lp - 6, y + 4);
+  }
+  ctx.textAlign = "center";
+  for (let k = 0; k <= 5; k++) { const i = Math.round((n - 1) * k / 5); ctx.fillText(String(i + 1), X(i), h - 12); }
+  if (o.ref !== undefined) { ctx.setLineDash([5, 5]); ctx.strokeStyle = "rgba(74,222,128,.55)"; ctx.beginPath(); ctx.moveTo(Lp, Y(o.ref)); ctx.lineTo(Lp + pw, Y(o.ref)); ctx.stroke(); ctx.setLineDash([]); }
+  const stride = Math.max(1, Math.floor(n / pw));
+  for (const s of o.series) {
+    if (s.data.length < 2) continue;
+    ctx.beginPath();
+    for (let i = 0; i < s.data.length; i += stride) { const x = X(i), y = Y(s.data[i]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    if (s.fill) {
+      ctx.save(); ctx.lineTo(X(s.data.length - 1), Tp + ph); ctx.lineTo(X(0), Tp + ph); ctx.closePath();
+      const fg = ctx.createLinearGradient(0, Tp, 0, Tp + ph); fg.addColorStop(0, s.color + "55"); fg.addColorStop(1, s.color + "00");
+      ctx.fillStyle = fg; ctx.fill(); ctx.restore();
+      ctx.beginPath(); for (let i = 0; i < s.data.length; i += stride) { const x = X(i), y = Y(s.data[i]); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    }
+    ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 2; ctx.globalAlpha = s.alpha || 1; ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  ctx.fillStyle = "#64748b"; ctx.font = "11px Segoe UI"; ctx.textAlign = "right"; ctx.fillText("Episode →", Lp + pw, h - 1);
+  if (o.ylabel) { ctx.save(); ctx.translate(12, Tp + ph / 2); ctx.rotate(-PI / 2); ctx.textAlign = "center"; ctx.fillText(o.ylabel, 0, 0); ctx.restore(); }
+}
+
+const VIRIDIS = [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]];
+function cmap(t) {
+  t = clip(t, 0, 1) * (VIRIDIS.length - 1); const i = Math.min(Math.floor(t), VIRIDIS.length - 2), f = t - i, a = VIRIDIS[i], b = VIRIDIS[i + 1];
+  return `rgb(${Math.round(a[0] + (b[0] - a[0]) * f)},${Math.round(a[1] + (b[1] - a[1]) * f)},${Math.round(a[2] + (b[2] - a[2]) * f)})`;
+}
+function heatmap(c, L, mode) {
+  const S = setupCanvas(c); if (!S) return; const { ctx, w, h } = S;
+  ctx.clearRect(0, 0, w, h);
+  const ag = L.agent, cfg = L.cfg, n1 = ag.n1, n2 = ag.n2;
+  const Lp = 46, Rp = mode === "value" ? 52 : 14, Tp = 10, Bp = 34, pw = w - Lp - Rp, ph = h - Tp - Bp, cw = pw / n1, chh = ph / n2;
+  let vmin = Infinity, vmax = -Infinity;
+  if (mode === "value") for (let k = 0; k < n1 * n2; k++) if (ag.visits[k] > 0) { const v = ag.vmax(k); vmin = Math.min(vmin, v); vmax = Math.max(vmax, v); }
+  if (!isFinite(vmin)) { vmin = 0; vmax = 1; } if (vmax - vmin < 1e-9) vmax = vmin + 1;
+  for (let i = 0; i < n1; i++) for (let j = 0; j < n2; j++) {
+    const k = i * n2 + j, vis = ag.visits[k] > 0, x = Lp + i * cw, y = Tp + (n2 - 1 - j) * chh;
+    if (mode === "policy") { ctx.fillStyle = cfg.actionColors[ag.greedy(k)]; ctx.globalAlpha = vis ? 0.88 : 0.1; }
+    else { ctx.fillStyle = vis ? cmap((ag.vmax(k) - vmin) / (vmax - vmin)) : "#1e293b"; ctx.globalAlpha = vis ? 1 : 0.5; }
+    ctx.fillRect(x + 0.6, y + 0.6, cw - 1.2, chh - 1.2);
+  }
+  ctx.globalAlpha = 1;
+  const ci = Math.floor(L.cell / n2), cj = L.cell % n2;
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.shadowColor = "#fff"; ctx.shadowBlur = 10;
+  ctx.strokeRect(Lp + ci * cw + 1, Tp + (n2 - 1 - cj) * chh + 1, cw - 2, chh - 2); ctx.shadowBlur = 0;
+  ctx.fillStyle = "#94a3b8"; ctx.font = "11px Segoe UI"; ctx.textAlign = "center";
+  ctx.fillText(cfg.axes.x + " →", Lp + pw / 2, h - 8);
+  ctx.textAlign = "left"; ctx.fillText(cfg.axes.xl[0], Lp, h - 20); ctx.textAlign = "right"; ctx.fillText(cfg.axes.xl[1], Lp + pw, h - 20);
+  ctx.save(); ctx.translate(12, Tp + ph / 2); ctx.rotate(-PI / 2); ctx.textAlign = "center"; ctx.fillText(cfg.axes.y + " →", 0, 0); ctx.restore();
+  ctx.textAlign = "right"; ctx.fillText(cfg.axes.yl[1], Lp - 4, Tp + 10); ctx.fillText(cfg.axes.yl[0], Lp - 4, Tp + ph);
+  if (mode === "value") {
+    const bx = Lp + pw + 12, bw = 12;
+    for (let k = 0; k < ph; k++) { ctx.fillStyle = cmap(1 - k / ph); ctx.fillRect(bx, Tp + k, bw, 1.5); }
+    ctx.fillStyle = "#94a3b8"; ctx.textAlign = "left"; ctx.font = "10px Segoe UI";
+    ctx.fillText(vmax.toFixed(0), bx + bw + 3, Tp + 9); ctx.fillText(vmin.toFixed(0), bx + bw + 3, Tp + ph);
+  }
+}
+
+/* =========================================================
+   UI BUILDING
+   ========================================================= */
+const LABS = {};
+let OV_DIRTY = true, ACTIVE = "overview", FRAME = 0;
+
+function labPanelHTML(c) {
+  const legend = c.actions.map((a, i) => `<span><i style="background:${c.actionColors[i]}"></i>${a}</span>`).join("");
+  const better = c.higherBetter ? "càng cao càng tốt ↑" : "càng thấp càng tốt ↓";
+  return `
+  <div class="lab-head">
+    <h2>${c.icon} ${c.title}</h2>
+    <span class="badge" style="background:${c.color}22;color:${c.color};border:1px solid ${c.color}55">${c.algoName}</span>
+    <span class="badge mode-live" id="${c.id}-mode">● Live Training</span>
+  </div>
+  <div class="lab-grid">
+    <div class="card sim-wrap">
+      <canvas class="sim" id="${c.id}-sim"></canvas>
+      <div class="controls">
+        <button class="btn b-blue" data-act="train">⚡ Huấn luyện +${c.trainN} ep</button>
+        <button class="btn b-green" data-act="greedy">🏆 Greedy (đã học)</button>
+        <button class="btn b-amber" data-act="live">🔄 Live Train</button>
+        <button class="btn b-violet" data-act="disturb">${c.disturb.label}</button>
+        <button class="btn b-slate" data-act="pause">⏯ Tạm dừng</button>
+        <button class="btn b-red" data-act="reset">🗑 Reset</button>
+        <label class="speed">Tốc độ <input type="range" min="1" max="15" value="1" data-act="speed"><b data-role="speedv">1×</b></label>
+      </div>
+      ${c.hint ? `<div class="hint">${c.hint}</div>` : ""}
+    </div>
+    <div class="side">
+      <div class="card"><h3>📟 Trạng thái thời gian thực</h3><div class="stats" id="${c.id}-stats"></div></div>
+      <div class="card"><h3>🧮 Công thức cập nhật</h3><div class="formula">${c.formula}</div><p class="desc" style="margin-top:10px">${c.desc}</p></div>
+    </div>
+  </div>
+  <div class="charts">
+    <div class="card"><h3>📈 Đường cong học – Số bước / Episode <small>${better}</small></h3><canvas class="chart" id="${c.id}-c1"></canvas>
+      <div class="legend"><span><i style="background:#475569"></i>Từng episode</span><span><i style="background:${c.color}"></i>Trung bình trượt 20 ep</span></div></div>
+    <div class="card"><h3>💰 Tổng phần thưởng & Tỉ lệ thành công <small>trung bình trượt 20 ep</small></h3><canvas class="chart" id="${c.id}-c2"></canvas>
+      <div class="legend"><span><i style="background:#a78bfa"></i>Return / episode (trái)</span><span><i style="background:#4ade80"></i>Tỉ lệ thành công (%)</span></div></div>
+    <div class="card"><h3>🧭 Bản đồ chính sách π(s) = argmax<sub>a</sub> Q(s,a) <small>ô sáng = đã thăm · khung trắng = trạng thái hiện tại</small></h3><canvas class="chart" id="${c.id}-c3"></canvas>
+      <div class="legend">${legend}</div></div>
+    <div class="card"><h3>🔥 Hàm giá trị V(s) = max<sub>a</sub> Q(s,a) <small>tối = giá trị thấp · sáng = cao</small></h3><canvas class="chart" id="${c.id}-c4"></canvas>
+      <div class="legend"><span>Màu thể hiện kỳ vọng tổng phần thưởng tương lai tại mỗi ô trạng thái</span></div></div>
+  </div>`;
+}
+
+for (const id of ["l1", "l2", "l3"]) {
+  const c = CFG[id], panel = document.getElementById("panel-" + id);
+  panel.innerHTML = labPanelHTML(c);
+  const L = new Lab(c); LABS[id] = L;
+  panel.addEventListener("click", ev => {
+    const b = ev.target.closest("button[data-act]"); if (!b) return;
+    const act = b.dataset.act;
+    if (act === "train") L.queueTraining(c.trainN);
+    else if (act === "greedy") { L.trainQueue = 0; L.setMode("greedy"); }
+    else if (act === "live") { L.trainQueue = 0; L.setMode("live"); }
+    else if (act === "disturb") { L.banner = null; c.disturb.fn(L); L.cell = c.disc(L.env.state()); L.state = L.env.state(); }
+    else if (act === "pause") L.paused = !L.paused;
+    else if (act === "reset") L.reset();
+  });
+  panel.querySelector('input[data-act="speed"]').addEventListener("input", ev => {
+    L.speed = +ev.target.value; panel.querySelector('[data-role="speedv"]').textContent = L.speed + "×";
+  });
+}
+// Lab 2: click to place target
+document.getElementById("l2-sim").addEventListener("click", ev => {
+  const L = LABS.l2; if (!L.view || L.trainQueue > 0) return;
+  const r = ev.target.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top;
+  L.startEpisode(true, [(x - L.view.cx) / L.view.sc, (L.view.cy - y) / L.view.sc]);
+});
+
+function showTab(t) {
+  ACTIVE = t;
+  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === t));
+  document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + t));
+  if (LABS[t]) LABS[t].dirty = true; OV_DIRTY = true;
+  window.scrollTo({ top: 0 });
+}
+document.getElementById("nav").addEventListener("click", ev => { const b = ev.target.closest("button[data-tab]"); if (b) showTab(b.dataset.tab); });
+document.querySelectorAll("[data-goto]").forEach(el => el.addEventListener("click", () => showTab(el.dataset.goto)));
+document.getElementById("train-all").addEventListener("click", () => Object.values(LABS).forEach(L => L.queueTraining(L.cfg.trainN)));
+document.getElementById("reset-all").addEventListener("click", () => Object.values(LABS).forEach(L => L.reset()));
+window.addEventListener("resize", () => { Object.values(LABS).forEach(L => L.dirty = true); OV_DIRTY = true; });
+
+/* =========================================================
+   RENDER HELPERS
+   ========================================================= */
+function renderStats(L) {
+  const ag = L.agent, sr = lastMean(ag.success, 20), st = lastMean(ag.steps, 20);
+  const rows = [
+    ["Episodes đã học", ag.episodes, "#fff"],
+    ["Bước trong episode", `${L.epSteps}`, "#e2e8f0"],
+    ...L.cfg.stats(L),
+    ["Hành động", L.cfg.actions[L.lastAction], L.cfg.actionColors[L.lastAction]],
+    ["ε (tỉ lệ khám phá)", L.eps().toFixed(3), "#a78bfa"],
+    ["α (tốc độ học)", L.alpha().toFixed(3), "#a78bfa"],
+    ["Thành công (20 ep)", sr === null ? "—" : sr.toFixed(0) + " %", "#4ade80"],
+    ["Số bước TB (20 ep)", st === null ? "—" : st.toFixed(1), "#fbbf24"],
+  ];
+  document.getElementById(L.cfg.id + "-stats").innerHTML = rows.map(([k, v, c]) => `<div class="stat"><span>${k}</span><b style="color:${c}">${v}</b></div>`).join("");
+  const mb = document.getElementById(L.cfg.id + "-mode");
+  if (L.trainQueue > 0) { mb.className = "badge mode-train"; mb.textContent = "⚡ Đang huấn luyện nhanh"; }
+  else if (L.mode === "greedy") { mb.className = "badge mode-greedy"; mb.textContent = "🏆 Greedy – biểu diễn chính sách đã học"; }
+  else { mb.className = "badge mode-live"; mb.textContent = "● Live Training (ε-greedy)"; }
+}
+
+function renderCharts(L, full) {
+  const id = L.cfg.id, ag = L.agent;
+  if (full) {
+    lineChart(document.getElementById(id + "-c1"), {
+      series: [{ data: ag.steps, color: "#475569", width: 1, alpha: 0.8 }, { data: movingAvg(ag.steps, 20), color: L.cfg.color, width: 2.6, fill: true }],
+      ymin: 0, ymax: L.cfg.maxSteps * 1.04, ylabel: "Số bước", ref: L.cfg.higherBetter ? L.cfg.maxSteps : undefined,
+    });
+    const rets = movingAvg(ag.returns, 20), succ = movingAvg(ag.success, 20);
+    let lo = Math.min(...rets, 0), hi = Math.max(...rets, 1);
+    if (!rets.length) { lo = 0; hi = 1; }
+    const scaled = succ.map(s => lo + (hi - lo) * s / 100);
+    lineChart(document.getElementById(id + "-c2"), {
+      series: [{ data: rets, color: "#a78bfa", width: 2.4, fill: true }, { data: scaled, color: "#4ade80", width: 2, alpha: 0.9 }],
+      ymin: lo - (hi - lo) * 0.05, ymax: hi + (hi - lo) * 0.05, ylabel: "Return",
+    });
+  }
+  heatmap(document.getElementById(id + "-c3"), L, "policy");
+  heatmap(document.getElementById(id + "-c4"), L, "value");
+}
+
+function renderOverview() {
+  const labs = [LABS.l1, LABS.l2, LABS.l3], cols = ["#38bdf8", "#fbbf24", "#4ade80"];
+  lineChart(document.getElementById("ov-chart"), {
+    series: labs.map((L, i) => ({ data: movingAvg(L.agent.success, 20), color: cols[i], width: 2.4 })),
+    ymin: 0, ymax: 105, ylabel: "% thành công", ref: 100, empty: "Bấm 🚀 Huấn luyện cả 3 Lab để xem so sánh",
+  });
+  document.getElementById("ov-table").innerHTML = labs.map((L, i) => {
+    const sr = lastMean(L.agent.success, 20), st = lastMean(L.agent.steps, 20);
+    return `<tr><td><b style="color:${cols[i]}">${L.cfg.icon} Lab ${i + 1}</b></td><td>${L.cfg.algoName.split(" (")[0]}</td><td>${L.agent.episodes}</td>
+      <td>${sr === null ? "—" : sr.toFixed(0) + " %"}</td><td>${st === null ? "—" : st.toFixed(1)}</td></tr>`;
+  }).join("");
+}
+
+/* =========================================================
+   MAIN LOOP
+   ========================================================= */
+const DRAW = { l1: drawLab1, l2: drawLab2, l3: drawLab3 };
+function loop() {
+  FRAME++;
+  for (const id in LABS) { const L = LABS[id]; if (L.trainQueue > 0 || id === ACTIVE) L.frame(); }
+  const L = LABS[ACTIVE];
+  if (L) {
+    const S = setupCanvas(document.getElementById(ACTIVE + "-sim"));
+    if (S) { DRAW[ACTIVE](S.ctx, S.w, S.h, L); drawOverlay(S.ctx, S.w, S.h, L); }
+    if (FRAME % 3 === 0) renderStats(L);
+    if (L.dirty || FRAME % 8 === 0) { renderCharts(L, L.dirty); L.dirty = false; }
+  } else if (OV_DIRTY || FRAME % 30 === 0) { renderOverview(); OV_DIRTY = false; }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
+

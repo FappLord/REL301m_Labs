@@ -14,12 +14,12 @@ class BallAndBeamEnv:
     - Continuous State: (x, v, theta)
       * x in [-1.0, +1.0] m: Ball position from the center pivot (Target: x = 0.0)
       * v in [-1.2, +1.2] m/s: Ball rolling velocity along the beam
-      * theta in [-0.26, +0.26] rad (+/- 15 deg): Beam tilt angle (positive = right side down)
+      * theta in [-0.24, +0.24] rad (+/- 13.7 deg): Beam tilt angle
     - Actions:
-      * 0: Tilt Beam Left  (d_theta = -0.025 rad)
-      * 1: Hold Beam Angle (d_theta =  0.000 rad)
-      * 2: Tilt Beam Right (d_theta = +0.025 rad)
-    - Goal: Prevent the ball from rolling off the edges (|x| > 1.0) and stabilize it at x = 0.
+      * 0: Tilt Beam Left  (Drive tilt toward negative angle to push ball Left)
+      * 1: Stabilize / Center Beam (Smoothly level the beam when near equilibrium)
+      * 2: Tilt Beam Right (Drive tilt toward positive angle to push ball Right)
+    - Goal: Prevent the ball from rolling off the edges (|x| > 1.0) and smoothly stabilize it at x = 0.
     """
     def __init__(self, seed=42):
         self.rng = np.random.default_rng(seed)
@@ -27,33 +27,44 @@ class BallAndBeamEnv:
         self.dt = 0.025
         self.max_x = 1.0
         self.max_v = 1.2
-        self.max_theta = math.radians(15.0)
-        self.d_theta = math.radians(1.6)
+        self.max_theta = math.radians(14.0)
+        self.theta_dot = 0.0
         self.num_actions = 3
         self.reset()
 
     def reset(self):
-        # Start the ball away from the center with nonzero velocity so an untrained beam drops it
+        # Start the ball rolling outward toward an edge so an untrained beam drops it quickly
         side = -1.0 if self.rng.random() < 0.5 else 1.0
-        self.x = float(side * self.rng.uniform(0.35, 0.70))
-        self.v = float(side * self.rng.uniform(0.05, 0.25))
-        self.theta = float(self.rng.uniform(-0.08, 0.08))
+        self.x = float(side * self.rng.uniform(0.40, 0.68))
+        self.v = float(side * self.rng.uniform(0.28, 0.45))
+        self.theta = float(side * self.rng.uniform(0.03, 0.08))
+        self.theta_dot = 0.0
         return self.get_state()
 
     def get_state(self):
         return (self.x, self.v, self.theta)
 
     def step(self, action):
-        # Update beam tilt angle
+        # Smooth servo actuator dynamics (eliminates high-frequency bang-bang chattering)
+        err_mag = min(1.0, abs(self.x) * 1.5 + abs(self.v) * 2.0)
+        step_rate = math.radians(1.25) * (0.10 + 0.90 * err_mag)
+
         if action == 0:
-            self.theta -= self.d_theta
+            target_delta = -step_rate
         elif action == 2:
-            self.theta += self.d_theta
-        self.theta = float(np.clip(self.theta, -self.max_theta, self.max_theta))
+            target_delta = +step_rate
+        else:
+            # Action 1 smoothly returns the beam toward flat horizontal (theta -> 0)
+            target_delta = float(np.clip(-0.35 * self.theta, -step_rate, step_rate))
+
+        # Low-pass filter on beam angular velocity for fluid mechanical motion
+        self.theta_dot = 0.72 * self.theta_dot + 0.28 * target_delta
+        self.theta = float(np.clip(self.theta + self.theta_dot, -self.max_theta, self.max_theta))
 
         # Solid sphere rolling down an inclined plane: a = (5/7) * g * sin(theta)
         accel = (5.0 / 7.0) * self.gravity * math.sin(self.theta)
-        self.v = float(np.clip(0.992 * self.v + accel * self.dt, -self.max_v, self.max_v))
+        damping = 0.962 if abs(self.x) < 0.12 else 0.988
+        self.v = float(np.clip(damping * self.v + accel * self.dt, -self.max_v, self.max_v))
         self.x = float(self.x + self.v * self.dt)
 
         dropped = abs(self.x) > self.max_x
@@ -61,10 +72,11 @@ class BallAndBeamEnv:
         if dropped:
             reward = -50.0
         else:
-            # Desired tilt angle naturally opposes ball offset (x) and rolling speed (v)
-            desired_theta = np.clip(-0.22 * self.x - 0.35 * self.v, -self.max_theta, self.max_theta)
+            desired_theta = float(np.clip(-0.22 * self.x - 0.36 * self.v, -self.max_theta, self.max_theta))
             angle_err = abs(self.theta - desired_theta)
-            reward = 2.0 - 1.5 * abs(self.x) - 0.8 * abs(self.v) - 6.0 * angle_err
+            reward = 2.0 - 1.6 * abs(self.x) - 0.9 * abs(self.v) - 7.0 * angle_err
+            if action == 1 and abs(desired_theta) < 0.025:
+                reward += 1.0
 
         return self.get_state(), reward, dropped
 
@@ -78,10 +90,10 @@ class QLearningBallBeamAgent:
         self.gamma = gamma
         self.epsilon = epsilon
 
-        # Discretize composite desired-tilt error and current beam angle
-        # Composite ball state s_ball = x + 1.5 * v captures both position and momentum
-        self.ball_bins = np.linspace(-1.1, 1.1, n_bins - 1)
-        self.theta_bins = np.linspace(-env.max_theta * 0.85, env.max_theta * 0.85, n_bins - 1)
+        # Discretize composite ball state (x + 1.6*v) and current beam angle
+        # Symmetric bins with a dedicated center deadzone bin around 0
+        self.ball_bins = np.array([-0.75, -0.45, -0.22, -0.08, -0.025, 0.025, 0.08, 0.22, 0.45, 0.75])
+        self.theta_bins = np.array([-0.18, -0.11, -0.06, -0.025, -0.008, 0.008, 0.025, 0.06, 0.11, 0.18])
         self.q_shape = (n_bins, n_bins, env.num_actions)
         self.reset_q()
 
@@ -92,7 +104,7 @@ class QLearningBallBeamAgent:
 
     def discretize(self, state):
         x, v, theta = state
-        ball_state = x + 1.55 * v
+        ball_state = x + 1.6 * v
         return (
             int(np.digitize(ball_state, self.ball_bins)),
             int(np.digitize(theta, self.theta_bins)),
@@ -202,7 +214,7 @@ class BallAndBeamVisualizerApp:
         self.lbl_theta = tk.Label(side, text="Góc nghiêng (θ): +0.0°", font=("Consolas", 11), fg="#e2e8f0", bg="#0f172a")
         self.lbl_theta.pack(anchor="w", pady=2)
 
-        self.lbl_act = tk.Label(side, text="Điều khiển:      Giữ nguyên", font=("Consolas", 11, "bold"), fg="#a78bfa", bg="#0f172a")
+        self.lbl_act = tk.Label(side, text="Điều khiển:      Cân bằng", font=("Consolas", 11, "bold"), fg="#a78bfa", bg="#0f172a")
         self.lbl_act.pack(anchor="w", pady=4)
 
         self.lbl_best = tk.Label(side, text="Kỷ lục lâu nhất: 0 / 400 bước", font=("Consolas", 10), fg="#4ade80", bg="#0f172a")
@@ -261,7 +273,6 @@ class BallAndBeamVisualizerApp:
         self._draw_learning_curve()
 
     def push_ball(self):
-        # Give the ball a strong velocity kick toward one of the edges
         direction = -1.0 if self.env.x >= 0 else 1.0
         self.env.v = float(direction * 0.65)
         self.state = self.env.get_state()
@@ -287,53 +298,45 @@ class BallAndBeamVisualizerApp:
         c = self.canvas
         c.delete("all")
         w = c.winfo_width() or self.canvas_w
-        h = c.winfo_height() or self.canvas_h
+        h = self.canvas.winfo_height() or self.canvas_h
 
         cx, cy = w / 2, h * 0.56
         beam_half_px = 240
         x, v, theta = self.state
 
-        # Reference horizontal dashed line
         c.create_line(cx - 270, cy, cx + 270, cy, fill="#1e293b", dash=(4, 4), width=2)
 
-        # Support pedestal triangle (Fulcrum)
+        # Support pedestal triangle
         c.create_polygon(cx, cy + 6, cx - 36, cy + 95, cx + 36, cy + 95, fill="#334155", outline="#94a3b8", width=2)
         c.create_rectangle(cx - 70, cy + 95, cx + 70, cy + 110, fill="#1e293b", outline="#64748b", width=2)
 
-        # Beam endpoints rotated by theta (positive theta = right side down)
         cos_t, sin_t = math.cos(theta), math.sin(theta)
         lx1, ly1 = cx - beam_half_px * cos_t, cy - beam_half_px * sin_t
         lx2, ly2 = cx + beam_half_px * cos_t, cy + beam_half_px * sin_t
 
-        # Draw Beam Bar
         c.create_line(lx1, ly1, lx2, ly2, fill="#38bdf8", width=12, capstyle=tk.ROUND)
 
-        # Center target zone marker on the beam
+        # Center target zone marker
         c.create_line(cx - 18 * cos_t, cy - 18 * sin_t, cx + 18 * cos_t, cy + 18 * sin_t, fill="#22c55e", width=14)
         c.create_oval(cx - 6, cy - 6, cx + 6, cy + 6, fill="#f8fafc", outline="#0f172a", width=2)
         c.create_text(cx, cy + 128, text="TRỤC XOAY & VÙNG ĐÍCH CÂN BẰNG (x = 0.0m)", fill="#4ade80", font=("Segoe UI", 9, "bold"))
 
-        # Ball position along the tilted beam
         ball_r = 18
         dist_px = (x / self.env.max_x) * beam_half_px
-        # Offset ball center perpendicular to beam surface
         nx, ny = sin_t, -cos_t
         bx = cx + dist_px * cos_t + nx * (ball_r + 6)
         by = cy + dist_px * sin_t + ny * (ball_r + 6)
 
-        ball_color = "#4ade80" if abs(x) < 0.12 and abs(v) < 0.12 else ("#fbbf24" if abs(x) < 0.65 else "#ef4444")
+        ball_color = "#4ade80" if abs(x) < 0.08 and abs(v) < 0.08 else ("#fbbf24" if abs(x) < 0.65 else "#ef4444")
         c.create_oval(bx - ball_r, by - ball_r, bx + ball_r, by + ball_r, fill=ball_color, outline="white", width=2)
-        # Inner shine on ball
         c.create_oval(bx - 7, by - 7, bx - 1, by - 1, fill="white", outline="")
 
-        # Velocity vector arrow on ball
-        if abs(v) > 0.03:
+        if abs(v) > 0.025:
             arrow_len = v * 75
             ax2 = bx + arrow_len * cos_t
             ay2 = by + arrow_len * sin_t
             c.create_line(bx, by, ax2, ay2, fill="#f97316", width=3, arrow=tk.LAST)
 
-        # Banner
         if self.banner_timer > 0:
             c.create_rectangle(w / 2 - 205, 25, w / 2 + 205, 68, fill=self.banner_color, outline="white", width=2)
             c.create_text(w / 2, 46, text=self.banner_text, fill="white", font=("Segoe UI", 12, "bold"))
@@ -399,7 +402,7 @@ class BallAndBeamVisualizerApp:
                         break
 
         x, v, theta = self.state
-        act_names = {0: "↙ Nghiêng Trái", 1: "• Giữ Nguyên", 2: "↘ Nghiêng Phải"}
+        act_names = {0: "↙ Nghiêng Trái", 1: "⚖ Giữ Cân Bằng", 2: "↘ Nghiêng Phải"}
         self.lbl_ep.config(text=f"Episodes đã học: {self.agent.episodes_trained}")
         self.lbl_step.config(text=f"Bước giữ bóng:   {self.current_steps} / 400")
         self.lbl_x.config(text=f"Vị trí bóng (x): {x:+.2f} m")
@@ -415,4 +418,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = BallAndBeamVisualizerApp(root)
     root.mainloop()
-

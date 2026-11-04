@@ -9,34 +9,36 @@ import numpy as np
 # =====================================================================
 class RoboticArmEnv:
     """
-    2-DOF Planar Robotic Arm Target Reacher Environment.
+    2-DOF Planar Robotic Arm Target Reacher Environment with Smooth Servo Dynamics.
     - Link lengths: L1 = 0.55 m (Upper Arm), L2 = 0.45 m (Forearm + Gripper).
     - Joint angles:
       * theta1 in [-pi, pi]:      Shoulder rotation angle
-      * theta2 in [0.15, 2.75]:   Elbow flexion angle
+      * theta2 in [0.18, 2.70]:   Elbow flexion angle
     - Forward Kinematics:
       * Elbow:   (x1, y1) = (L1*cos(theta1), L1*sin(theta1))
       * Gripper: (xe, ye) = (x1 + L2*cos(theta1 + theta2), y1 + L2*sin(theta1 + theta2))
     - Actions (5 discrete motor commands):
-      * 0: Rotate Shoulder Counter-Clockwise (+d_theta)
-      * 1: Rotate Shoulder Clockwise         (-d_theta)
-      * 2: Extend Elbow Outward              (-d_theta)
-      * 3: Flex Elbow Inward                 (+d_theta)
-      * 4: Hold Joints Still
-    - Goal: Move the Gripper (xe, ye) into the Target Orb (xt, yt) within radius <= 0.06 m.
+      * 0: Rotate Shoulder Counter-Clockwise (+omega1)
+      * 1: Rotate Shoulder Clockwise         (-omega1)
+      * 2: Extend Elbow Outward              (-omega2)
+      * 3: Flex Elbow Inward                 (+omega2)
+      * 4: Fine-Lock / Hold Joints
+    - Goal: Smoothly guide the Gripper (xe, ye) into the Target Orb (xt, yt) within radius <= 0.06 m.
     """
     def __init__(self, seed=42):
         self.rng = np.random.default_rng(seed)
         self.L1 = 0.55
         self.L2 = 0.45
-        self.d_theta = 0.065
+        self.max_step = 0.055
         self.min_theta2 = 0.18
         self.max_theta2 = 2.70
-        self.target_radius = 0.065
+        self.target_radius = 0.060
         self.num_actions = 5
 
         self.theta1 = 0.0
         self.theta2 = 1.2
+        self.omega1 = 0.0
+        self.omega2 = 0.0
         self.target_x = 0.5
         self.target_y = 0.5
         self.reset()
@@ -56,7 +58,6 @@ class RoboticArmEnv:
         if custom_xy is not None:
             tx, ty = custom_xy
             r = math.hypot(tx, ty)
-            # Clamp target within reachable annular workspace [0.22, 0.94]
             if r < 0.22 or r > 0.94:
                 ang = math.atan2(ty, tx)
                 r = float(np.clip(r, 0.22, 0.94))
@@ -72,6 +73,8 @@ class RoboticArmEnv:
         if not keep_arm_pose:
             self.theta1 = float(self.rng.uniform(-math.pi, math.pi))
             self.theta2 = float(self.rng.uniform(0.4, 2.3))
+        self.omega1 = 0.0
+        self.omega2 = 0.0
         self.spawn_target(custom_xy=custom_target)
         return self.get_state()
 
@@ -88,24 +91,49 @@ class RoboticArmEnv:
         return (delta_phi, delta_r, dist)
 
     def step(self, action):
-        _, (prev_xe, prev_ye) = self.forward_kinematics()
-        prev_dist = math.hypot(self.target_x - prev_xe, self.target_y - prev_ye)
+        delta_phi, delta_r, prev_dist = self.get_state()
 
-        if action == 0:
-            self.theta1 = self.wrap_angle(self.theta1 + self.d_theta)
-        elif action == 1:
-            self.theta1 = self.wrap_angle(self.theta1 - self.d_theta)
-        elif action == 2:
-            self.theta2 = float(np.clip(self.theta2 - self.d_theta, self.min_theta2, self.max_theta2))
-        elif action == 3:
-            self.theta2 = float(np.clip(self.theta2 + self.d_theta, self.min_theta2, self.max_theta2))
+        # Proportional velocity scaling prevents overshoot & chattering near zero error
+        phi_scale = min(1.0, max(0.12, abs(delta_phi) / 0.16))
+        r_scale = min(1.0, max(0.12, abs(delta_r) / 0.14))
+
+        cmd_w1 = 0.0
+        cmd_w2 = 0.0
+
+        if action == 0:  # Shoulder CCW (+theta1)
+            cmd_w1 = +self.max_step * phi_scale
+            # Co-articulate elbow gently when radial error is also present for diagonal smoothness
+            if abs(delta_r) > 0.03:
+                cmd_w2 = -0.35 * np.sign(delta_r) * self.max_step * r_scale
+        elif action == 1:  # Shoulder CW (-theta1)
+            cmd_w1 = -self.max_step * phi_scale
+            if abs(delta_r) > 0.03:
+                cmd_w2 = -0.35 * np.sign(delta_r) * self.max_step * r_scale
+        elif action == 2:  # Extend Elbow (-theta2 -> increases reach r)
+            cmd_w2 = -self.max_step * r_scale
+            # Compensate shoulder for elbow extension so gripper moves radially straight!
+            cmd_w1 = +0.42 * self.max_step * r_scale
+        elif action == 3:  # Flex Elbow (+theta2 -> decreases reach r)
+            cmd_w2 = +self.max_step * r_scale
+            cmd_w1 = -0.42 * self.max_step * r_scale
+        else:  # Action 4: Fine-lock / damp velocity when very close
+            cmd_w1 = 0.25 * np.clip(delta_phi, -self.max_step, self.max_step)
+            cmd_w2 = -0.25 * np.clip(delta_r, -self.max_step, self.max_step)
+
+        # Low-pass velocity filter for fluid industrial robot motion
+        self.omega1 = 0.55 * self.omega1 + 0.45 * cmd_w1
+        self.omega2 = 0.55 * self.omega2 + 0.45 * cmd_w2
+
+        self.theta1 = self.wrap_angle(self.theta1 + self.omega1)
+        self.theta2 = float(np.clip(self.theta2 + self.omega2, self.min_theta2, self.max_theta2))
 
         state = self.get_state()
         dist = state[2]
         reached = dist <= self.target_radius
 
-        # Potential-based distance reduction reward + bonus on target grab
-        reward = (prev_dist - dist) * 25.0 - 0.15
+        reward = (prev_dist - dist) * 28.0 - 0.12
+        if action == 4 and dist < 0.12:
+            reward += 0.5
         if reached:
             reward += 50.0
 
@@ -121,9 +149,9 @@ class ExpectedSarsaArmAgent:
         self.gamma = gamma
         self.epsilon = epsilon
 
-        # Discretize relative angular error (delta_phi) and radial reach error (delta_r)
-        self.phi_bins = np.linspace(-0.8, 0.8, n_bins - 1)
-        self.r_bins = np.linspace(-0.45, 0.45, n_bins - 1)
+        # Symmetric bins with a dedicated center deadzone bin [-0.035, +0.035]
+        self.phi_bins = np.array([-0.80, -0.40, -0.18, -0.08, -0.03, 0.03, 0.08, 0.18, 0.40, 0.80])
+        self.r_bins = np.array([-0.45, -0.25, -0.12, -0.05, -0.02, 0.02, 0.05, 0.12, 0.25, 0.45])
         self.reset_q()
 
     def reset_q(self):
@@ -227,7 +255,6 @@ class RoboticArmVisualizerApp:
             main_frame, width=self.canvas_w, height=self.canvas_h, bg="#0b1120", highlightthickness=1, highlightbackground="#334155", cursor="crosshair"
         )
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        # Allow clicking anywhere on the workspace to place the target orb!
         self.canvas.bind("<Button-1>", self._on_canvas_click)
 
         # Right Dashboard
@@ -305,11 +332,12 @@ class RoboticArmVisualizerApp:
         wy = (cy - event.y) / scale
         self._start_new_episode(keep_pose=True, custom_target=(wx, wy))
 
-    def _start_new_episode(self, keep_pose=False, custom_target=None):
+    def _start_new_episode(self, keep_pose=True, custom_target=None):
         self.state = self.env.reset(keep_arm_pose=keep_pose, custom_target=custom_target)
         self.s_idx = self.agent.discretize(self.state)
         self.current_steps = 0
         self.action = 4
+        self.banner_timer = 0
         self.gripper_trail.clear()
 
     def fast_train_300(self):
@@ -325,7 +353,7 @@ class RoboticArmVisualizerApp:
     def set_live_train_mode(self):
         self.mode = "LIVE_TRAIN"
         self.lbl_status.config(text="Chế độ: Đang tự học trực tiếp (Live Expected SARSA)", fg="#fbbf24")
-        self._start_new_episode()
+        self._start_new_episode(keep_pose=True)
 
     def reset_all(self):
         self.agent.reset_q()
@@ -348,7 +376,6 @@ class RoboticArmVisualizerApp:
         cx, cy = w / 2, h / 2
         scale = 195.0
 
-        # Draw Reachable Workspace Rings
         r_max = (self.env.L1 + self.env.L2) * scale
         r_min = 0.22 * scale
         c.create_oval(cx - r_max, cy - r_max, cx + r_max, cy + r_max, outline="#1e293b", width=2, dash=(4, 4))
@@ -356,34 +383,29 @@ class RoboticArmVisualizerApp:
         c.create_line(cx - r_max, cy, cx + r_max, cy, fill="#111827")
         c.create_line(cx, cy - r_max, cx, cy + r_max, fill="#111827")
 
-        # Draw Target Orb
         tx, ty = self._world_to_screen(self.env.target_x, self.env.target_y)
         tr = self.env.target_radius * scale
         c.create_oval(tx - tr - 5, ty - tr - 5, tx + tr + 5, ty + tr + 5, outline="#22c55e", width=1, dash=(2, 2))
         c.create_oval(tx - tr, ty - tr, tx + tr, ty + tr, fill="#16a34a", outline="#bbf7d0", width=2)
         c.create_text(tx, ty - tr - 14, text="MỤC TIÊU", fill="#4ade80", font=("Segoe UI", 9, "bold"))
 
-        # Forward Kinematics
         (x1, y1), (xe, ye) = self.env.forward_kinematics()
         sx1, sy1 = self._world_to_screen(x1, y1)
         sxe, sye = self._world_to_screen(xe, ye)
 
         self.gripper_trail.append((sxe, sye))
-        if len(self.gripper_trail) > 40:
+        if len(self.gripper_trail) > 45:
             self.gripper_trail.pop(0)
         if len(self.gripper_trail) >= 2:
             flat_t = [coord for pt in self.gripper_trail for coord in pt]
             c.create_line(flat_t, fill="#0284c7", width=2)
 
-        # Link 1 (Shoulder to Elbow) & Link 2 (Elbow to Gripper)
         c.create_line(cx, cy, sx1, sy1, fill="#38bdf8", width=12, capstyle=tk.ROUND)
         c.create_line(sx1, sy1, sxe, sye, fill="#fbbf24", width=9, capstyle=tk.ROUND)
 
-        # Base Pedestal & Elbow Joint
         c.create_oval(cx - 14, cy - 14, cx + 14, cy + 14, fill="#475569", outline="white", width=2)
         c.create_oval(sx1 - 9, sy1 - 9, sx1 + 9, sy1 + 9, fill="#0f172a", outline="#f8fafc", width=2)
 
-        # Gripper Claw at End-Effector
         ang = self.env.theta1 + self.env.theta2
         for sign in (-1, 1):
             claw_a = ang + sign * 0.45
@@ -392,7 +414,6 @@ class RoboticArmVisualizerApp:
             c.create_line(sxe, sye, gx1, gy1, fill="#f8fafc", width=3, capstyle=tk.ROUND)
         c.create_oval(sxe - 6, sye - 6, sxe + 6, sye + 6, fill="#ef4444", outline="white", width=2)
 
-        # Banner when target is grabbed
         if self.banner_timer > 0:
             c.create_rectangle(w / 2 - 190, 18, w / 2 + 190, 56, fill="#16a34a", outline="white", width=2)
             c.create_text(
@@ -451,7 +472,7 @@ class RoboticArmVisualizerApp:
                             self.targets_caught += 1
                             self.last_win_steps = self.current_steps
                             self.lbl_caught.config(text=f"Mục tiêu đã gắp: {self.targets_caught}")
-                            self.banner_timer = 14
+                            self.banner_timer = 16
                         else:
                             self._start_new_episode(keep_pose=True)
                         break
@@ -461,7 +482,7 @@ class RoboticArmVisualizerApp:
             1: "↻ Xoay Vai Phải (-θ1)",
             2: "↗ Duỗi Khuỷu (-θ2)",
             3: "↙ Gập Khuỷu (+θ2)",
-            4: "• Giữ Nguyên",
+            4: "⚖ Khóa Tinh Chỉnh",
         }
         self.lbl_ep.config(text=f"Episodes đã học: {self.agent.episodes_trained}")
         self.lbl_t1.config(text=f"Khớp vai (θ1):   {math.degrees(self.env.theta1):+.1f}°")
@@ -470,11 +491,10 @@ class RoboticArmVisualizerApp:
         self.lbl_act.config(text=f"Lệnh mô-tơ:      {act_names[self.action]}")
 
         self._draw_scene()
-        self.root.after(22, self._animate)
+        self.root.after(20, self._animate)
 
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = RoboticArmVisualizerApp(root)
     root.mainloop()
-

@@ -8,6 +8,8 @@ Bộ 3 bài Lab môn **Reinforcement Learning (REL301m)** mô phỏng các bài 
 
 ```text
 lab/
+├── index.html                              # Giao diện Web Dashboard tổng hợp 3 Lab + Biểu đồ trực tiếp
+├── PRESENTATION_SCRIPT.md                  # Kịch bản thuyết trình chi tiết cho 3 bài Lab
 ├── Lab1_Ball_And_Beam_QLearning/
 │   ├── ball_and_beam_qlearning.py          # Ứng dụng GUI mô phỏng Thanh bập bênh cân bằng bóng
 │   ├── Lab1_Ball_And_Beam_QLearning.ipynb  # Notebook báo cáo & thực nghiệm
@@ -24,7 +26,11 @@ lab/
 
 ---
 
-## Hướng dẫn chạy các ứng dụng mô phỏng (GUI)
+## 1. Chạy giao diện Web Dashboard tổng hợp (`index.html`)
+
+Mở trực tiếp file `index.html` trên trình duyệt (Chrome / Edge / Firefox) để trải nghiệm cả 3 bài Lab trên cùng một giao diện kèm 4 biểu đồ thời gian thực (Learning Curve, Episode Return & Success Rate, Bản đồ chính sách $\pi(s)$, và Bản đồ nhiệt $V(s)$).
+
+## 2. Hướng dẫn chạy các ứng dụng mô phỏng Python (Tkinter GUI)
 
 Yêu cầu cài đặt: Python 3.8+ cùng `numpy` và `matplotlib` (`tkinter` có sẵn trong Python chuẩn).
 
@@ -38,3 +44,4 @@ python Lab2_Robotic_Arm_Reacher_ExpectedSarsa/robotic_arm_sarsa.py
 # Chạy Lab 3: Xe Lấy Đà Leo Đồi (SARSA)
 python Lab3_Mountain_Car_SARSA/mountain_car_sarsa.py
 ```
+
