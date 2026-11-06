@@ -309,7 +309,7 @@ class RoboticArmVisualizerApp:
         ).pack(side=tk.LEFT, padx=4)
 
         tk.Button(
-            btn_frame, text="🎯 Đổi Vị Trí Mục Tiêu Khác", bg="#9333ea", fg="white", command=lambda: self._start_new_episode(keep_pose=True), **btn_style
+            btn_frame, text="🎯 Hất Mục Tiêu Ra Mép", bg="#9333ea", fg="white", command=self._push_target_to_edge, **btn_style
         ).pack(side=tk.LEFT, padx=4)
 
         tk.Button(
@@ -331,6 +331,12 @@ class RoboticArmVisualizerApp:
         wx = (event.x - cx) / scale
         wy = (cy - event.y) / scale
         self._start_new_episode(keep_pose=True, custom_target=(wx, wy))
+
+    def _push_target_to_edge(self):
+        _, (xe, ye) = self.env.forward_kinematics()
+        ang = math.atan2(ye, xe) + math.pi + float(self.env.rng.uniform(-0.55, 0.55))
+        r = float(self.env.rng.uniform(0.80, 0.92))
+        self._start_new_episode(keep_pose=True, custom_target=(r * math.cos(ang), r * math.sin(ang)))
 
     def _start_new_episode(self, keep_pose=True, custom_target=None):
         self.state = self.env.reset(keep_arm_pose=keep_pose, custom_target=custom_target)

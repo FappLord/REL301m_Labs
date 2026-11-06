@@ -274,8 +274,12 @@ class BallAndBeamVisualizerApp:
 
     def push_ball(self):
         direction = -1.0 if self.env.x >= 0 else 1.0
-        self.env.v = float(direction * 0.65)
+        self.env.x = float(direction * 0.48)
+        self.env.v = float(direction * 0.78)
+        self.env.theta = float(direction * 0.04)
+        self.env.theta_dot = 0.0
         self.state = self.env.get_state()
+        self.s_idx = self.agent.discretize(self.state)
 
     def set_greedy_mode(self):
         self.mode = "GREEDY_DEMO"
